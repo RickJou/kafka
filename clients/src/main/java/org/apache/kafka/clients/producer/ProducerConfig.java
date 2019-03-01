@@ -393,6 +393,7 @@ public class ProducerConfig extends AbstractConfig {
     }
 
     public ProducerConfig(Map<String, Object> props) {
+        //CONFIG对象首次是null
         super(CONFIG, props);
     }
 

@@ -228,6 +228,7 @@ import org.slf4j.Logger;
 public class KafkaProducer<K, V> implements Producer<K, V> {
 
     private final Logger log;
+    //用于client.id没有配置的请求下生成id后缀
     private static final AtomicInteger PRODUCER_CLIENT_ID_SEQUENCE = new AtomicInteger(1);
     private static final String JMX_PREFIX = "kafka.producer";
     public static final String NETWORK_THREAD_PREFIX = "kafka-producer-network-thread";
@@ -245,9 +246,11 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
     private final Thread ioThread;
     private final CompressionType compressionType;
     private final Sensor errors;
+    //创建Producer时的时间对象
     private final Time time;
     private final Serializer<K> keySerializer;
     private final Serializer<V> valueSerializer;
+    //Producer配置器,包含了所有配置
     private final ProducerConfig producerConfig;
     private final long maxBlockTimeMs;
     private final ProducerInterceptors<K, V> interceptors;
@@ -287,6 +290,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
     }
 
     /**
+     * 通过一组键值对对象创建KafkaProducer
      * A producer is instantiated by providing a set of key-value pairs as configuration. Valid configuration strings
      * are documented <a href="http://kafka.apache.org/documentation.html#producerconfigs">here</a>.
      * <p>
@@ -294,7 +298,10 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
      * @param properties   The producer configs
      */
     public KafkaProducer(Properties properties) {
-        this(propsToMap(properties), null, null, null, null, null, Time.SYSTEM);
+        this(
+                // properties转换为map
+                propsToMap(properties),
+                null, null, null, null, null, Time.SYSTEM);
     }
 
     /**
@@ -315,24 +322,32 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
 
     // visible for testing
     @SuppressWarnings("unchecked")
-    KafkaProducer(Map<String, Object> configs,
-                  Serializer<K> keySerializer,
-                  Serializer<V> valueSerializer,
+    KafkaProducer(Map<String, Object> configs,//配置文件
+                  Serializer<K> keySerializer,//key序列化器
+                  Serializer<V> valueSerializer,//value序列化器
                   Metadata metadata,
                   KafkaClient kafkaClient,
                   ProducerInterceptors interceptors,
                   Time time) {
-        ProducerConfig config = new ProducerConfig(ProducerConfig.addSerializerToConfig(configs, keySerializer,
-                valueSerializer));
+        //构建producer配置器对象
+        ProducerConfig config = new ProducerConfig(
+                //如果没有在config中使用key-value的形式设置keySerializer和valueSerializer,而是单独指定参数设置,则在此处将其添加到configs中
+                ProducerConfig.addSerializerToConfig(configs, keySerializer, valueSerializer)
+        );
         try {
+            //KafkaProducer 构造函数中的所有配置,浅复制
             Map<String, Object> userProvidedConfigs = config.originals();
             this.producerConfig = config;
             this.time = time;
+
+            //如果配置中没有配置client.id则产生一个递增的id名称,如:producer-${1/2/3/4}
             String clientId = config.getString(ProducerConfig.CLIENT_ID_CONFIG);
             if (clientId.length() <= 0)
                 clientId = "producer-" + PRODUCER_CLIENT_ID_SEQUENCE.getAndIncrement();
             this.clientId = clientId;
 
+            //如果配置中有提供transactional.id则使用提供的值,否则使用[Producer clientId=${client.id}]
+            //transactional.id的作用是用来生成KafkaProducer日志的前缀
             String transactionalId = userProvidedConfigs.containsKey(ProducerConfig.TRANSACTIONAL_ID_CONFIG) ?
                     (String) userProvidedConfigs.get(ProducerConfig.TRANSACTIONAL_ID_CONFIG) : null;
             LogContext logContext;
@@ -342,6 +357,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
                 logContext = new LogContext(String.format("[Producer clientId=%s, transactionalId=%s] ", clientId, transactionalId));
             log = logContext.logger(KafkaProducer.class);
             log.trace("Starting the Kafka producer");
+
 
             Map<String, String> metricTags = Collections.singletonMap("client-id", clientId);
             MetricConfig metricConfig = new MetricConfig().samples(config.getInt(ProducerConfig.METRICS_NUM_SAMPLES_CONFIG))

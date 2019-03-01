@@ -461,7 +461,10 @@ public class ConfigDef {
         // parse all known keys
         Map<String, Object> values = new HashMap<>();
         for (ConfigKey key : configKeys.values())
-            values.put(key.name, parseValue(key, props.get(key.name), props.containsKey(key.name)));
+            values.put(key.name,
+                    //检验和过去key对应的value对象
+                    parseValue(key, props.get(key.name),
+                            props.containsKey(key.name)));
         return values;
     }
 

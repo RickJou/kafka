@@ -59,13 +59,19 @@ public class AbstractConfig {
             if (!(entry.getKey() instanceof String))
                 throw new ConfigException(entry.getKey().toString(), entry.getValue(), "Key must be a string.");
         this.originals = (Map<String, ?>) originals;
+        //检验和获取value
         this.values = definition.parse(this.originals);
+        //获取进程解析后添加的配置
         Map<String, Object> configUpdates = postProcessParsedConfig(Collections.unmodifiableMap(this.values));
+        //将后面添加的配置合并到一起
         for (Map.Entry<String, Object> update : configUpdates.entrySet()) {
             this.values.put(update.getKey(), update.getValue());
         }
+        //definition中的配置则是最终所有配置的集合
         definition.parse(this.values);
+        //used中存储的key表示已经使用的key,用于对比检测所有配置中未使用的配置,注意这个是一个synchronizedSet
         this.used = Collections.synchronizedSet(new HashSet<>());
+        //参数中的definition系统初始化的时候是null,这个方法过程就是为了填充这个参数,最终赋值给本类中的definition属性
         this.definition = definition;
         if (doLog)
             logAll();
